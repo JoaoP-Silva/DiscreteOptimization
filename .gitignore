@@ -1,0 +1,9 @@
+#Coursera files
+Coursera/*
+
+#vscode files
+.vscode/*
+
+#.out files
+*.out
+
