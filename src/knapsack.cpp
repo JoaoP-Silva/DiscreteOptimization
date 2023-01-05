@@ -48,6 +48,8 @@ int main(int argc, char* argv[]){
     }
 
     int i = capacity, j = numItems;
+    int optimal = mtx[i][j];
+    cout << optimal << " " << "1" << endl;
     while(j != 0){
         if(mtx[i][j] == mtx[i][j - 1]){
             j --;
@@ -62,4 +64,5 @@ int main(int argc, char* argv[]){
     for(int i = 0; i < selectedItens.size(); i++){
         cout << selectedItens[i] << " ";
     }
+    cout << endl;
 }
