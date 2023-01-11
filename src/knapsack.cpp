@@ -7,7 +7,7 @@
 
 using namespace std;
 
-bool sortDescend(const pair<int, int>& a, const pair<int, int>& b){
+bool sortDescend(const pair<double, int>& a, const pair<double, int>& b){
     return(a.first > b.first);
 }
 
@@ -20,7 +20,7 @@ struct bnbNode{
 };
 
 int bound(vector<pair<int, int>>& items,unordered_set<int>& selected, unordered_set<int>& unselected, 
-                                vector<pair<int, int>>& density, int& capacity, int val, int weight){
+                                vector<pair<double, int>>& density, int& capacity, int val, int weight){
     
     for(auto item : density){
         int key = item.second;
@@ -46,7 +46,7 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
     
     int numItems = items.size();
     //Map with all values from linear relaxation
-    vector<pair<int, int>> relaxationArr;
+    vector<pair<double, int>> relaxationArr;
     for(int i = 0; i < items.size(); i++){
         float value = (float)items[i].second / items[i].first;
         relaxationArr.push_back(make_pair(value, i));
@@ -70,13 +70,13 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
     bnbNode withFirst, withoutFirst;
     withoutFirst.unselectedItems.insert(0);
     withoutFirst.itemIdx = 0;
-    bnbStack.push(withoutFirst);
 
     withFirst.selectedItems.insert(0);
     withFirst.itemIdx = 0;
     withFirst.val = items[0].second;
     withFirst.weight = items[0].first;
     bnbStack.push(withFirst);
+    bnbStack.push(withoutFirst);
     int best = -1;
     unordered_set<int> bestArr;
     while(!bnbStack.empty()){
@@ -154,7 +154,6 @@ int dynamicProgrammingSolver(vector<pair<int, int>>& items, int capacity,
 
     int i = capacity, j = numItems;
     int optimal = mtx[i][j];
-    cout << optimal << " " << "1" << endl;
     while(j != 0){
         if(mtx[i][j] == mtx[i][j - 1]){
             j --;
@@ -181,7 +180,9 @@ int main(int argc, char* argv[]){
             f >> items[i].first;
     }
 
-    
+    //int sol = dynamicProgrammingSolver(items, capacity, selectedItems);
+    int sol = bnbSolver(items, capacity, selectedItems);
+    cout << sol << " " << 1 << endl;
 
     for(int i = 0; i < selectedItems.size(); i++){
         cout << selectedItems[i] << " ";
