@@ -2,52 +2,124 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
-#include <queue>
-#include <map>
+#include <stack>
+#include <unordered_set>
 
 using namespace std;
 
 struct bnbNode{
-    bnbNode* parent;
-    int expectedValue;
-    int chosenValuesSum;
-    bool selectedItem;
-
-    bnbNode(bnbNode* p, int expected, bool selected) : parent(p), expectedValue(expected),
-                                                        selectedItem(selected) {}
+    unordered_set<int> selectedItems;
+    unordered_set<int> unselectedItems;
+    int val = 0;
+    int weight = 0;
+    int itemIdx = -1;
 };
 
 int bnbSolver(vector<pair<int, int>>& items, int capacity, 
-                            vector<bool>& selecteditems){
+                                vector<bool>& selectedItems){
     
     int numItems = items.size();
     //Map with all values from linear relaxation
-    map<int, vector<int>> relaxationMap;
+    vector<pair<int, int>> relaxationArr;
     for(int i = 0; i < items.size(); i++){
         float value = (float)items[i].second / items[i].first;
-        auto it = relaxationMap.find(value);
-        if(it != relaxationMap.end()){
-            it->second.push_back(i); 
-        }
-        else{
-            vector<int> vec; vec.push_back(i);
-            relaxationMap.insert(make_pair(value, vec));
+        relaxationArr.push_back(make_pair(value, i));
+    }
+    sort(relaxationArr.begin(), relaxationArr.end(), greater<>());
+
+    int remWeight = capacity, initialExpect = 0;
+    for(pair<int, int> p : relaxationArr){
+        int i = p.second, itemWeight = items[i].first, itemVal = items[i].second;
+        if(remWeight >= itemWeight){
+            remWeight -= itemWeight;
+            initialExpect += itemVal;
+        }else{
+            int val = p.first * remWeight;
+            initialExpect += val;
+            break;
         }
     }
-    int initialExpect = 0;
-    int remWeight = capacity;
-    for(auto it = relaxationMap.begin(); it != relaxationMap.end(); it++){
-        for(int i : it->second){
+
+    stack<bnbNode> bnbStack;
+    bnbNode withFirst, withoutFirst;
+    withoutFirst.unselectedItems.insert(0);
+    withoutFirst.itemIdx = 0;
+    bnbStack.push(withoutFirst);
+
+    withFirst.selectedItems.insert(0);
+    withFirst.itemIdx = 0;
+    withFirst.val = items[0].second;
+    withFirst.weight = items[0].first;
+    bnbStack.push(withFirst);
+    int best = -1;
+    unordered_set<int> bestArr;
+    while(!bnbStack.empty()){
+        bnbNode n = bnbStack.top(); bnbStack.pop();
+        if(n.itemIdx < items.size() -1){
+            n.itemIdx += 1;
+            int i = n.itemIdx;
+            int itemVal = items[i].second;
             int itemWeight = items[i].first;
-            if(itemWeight > remWeight){
-                
+            remWeight = capacity - n.weight;
+            if(itemWeight <= remWeight){
+                unordered_set<int> cpySelected = n.selectedItems;
+                cpySelected.insert(i);
+                int b = bound(items, cpySelected, n.unselectedItems, relaxationArr, capacity);
+                if(b > best){
+                    bnbNode newNode = n;
+                    newNode.selectedItems = cpySelected;
+                    newNode.weight += itemWeight;
+                    newNode.val += itemVal;
+                    bnbStack.push(newNode);
+                }
+            }
+            n.unselectedItems.insert(i);
+            int b = bound(items, n.selectedItems, n.unselectedItems, relaxationArr, capacity);
+            if(b > best){
+                bnbStack.push(n);
+            }
+        }else{
+            if(n.val > best){
+                best = n.val; bestArr = n.selectedItems;
             }
         }
     }
+
+    for(auto i : bestArr){
+        selectedItems[i] = 1;
+    }
 }
 
+int bound(vector<pair<int, int>>& items,unordered_set<int>& selected, unordered_set<int>& unselected, 
+                                                    vector<pair<int, int>>& density, int& capacity){
+    
+    int val = 0, weight = 0;
+    for(auto i : selected){
+        weight += items[i].first;
+        val += items[i].second;
+    }
+    
+    for(auto item : density){
+        int key = item.second;
+        if(selected.find(key) != selected.end() || unselected.find(key) != unselected.end()){
+            continue;
+        }
+        int itemWeight = items[key].first, itemVal = items[key].second, remWeight = capacity - weight;
+        if(remWeight >= itemWeight){
+            val += itemVal;
+            weight += itemWeight;
+        }else{
+            val += item.first * remWeight;
+            break;
+        }
+    }
+
+    return val;
+}
+
+
 int dynamicProgrammingSolver(vector<pair<int, int>>& items, int capacity, 
-                            vector<bool>& selecteditems){
+                            vector<bool>& selectedItems){
 
     int numItems = items.size();
     vector<vector<int>> mtx(capacity + 1, vector<int>(numItems + 1, 0));
@@ -61,7 +133,7 @@ int dynamicProgrammingSolver(vector<pair<int, int>>& items, int capacity,
             mtx[k][j] = mtx[k][j - 1];
         }
 
-        //Test if adds the item or not
+        //Test whether to add the item or not
         while(i <= capacity){
             int valWithoutItem = mtx[i][j - 1];
             int valWithItem = itemVal + mtx[i - itemWeight][j - 1];
@@ -86,7 +158,7 @@ int dynamicProgrammingSolver(vector<pair<int, int>>& items, int capacity,
             j --;
         }
         else{
-            selecteditems[j - 1] = 1;
+            selectedItems[j - 1] = 1;
             int itemWeight = items[j - 1].first;
             i -= itemWeight; j--;
         }
@@ -99,7 +171,7 @@ int main(int argc, char* argv[]){
     fstream f(fName, fstream::in | fstream::out);
     int numItems, capacity;
     f >> numItems; f >> capacity;
-    vector<bool> selecteditems(numItems, 0);
+    vector<bool> selectedItems(numItems, 0);
 
     vector<pair<int, int>> items(numItems, make_pair(0, 0));
     for(int i = 0; i < numItems; i++){
@@ -109,8 +181,8 @@ int main(int argc, char* argv[]){
 
     
 
-    for(int i = 0; i < selecteditems.size(); i++){
-        cout << selecteditems[i] << " ";
+    for(int i = 0; i < selectedItems.size(); i++){
+        cout << selectedItems[i] << " ";
     }
     cout << endl;
 }
