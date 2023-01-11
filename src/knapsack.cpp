@@ -7,6 +7,10 @@
 
 using namespace std;
 
+bool sortDescend(const pair<int, int>& a, const pair<int, int>& b){
+    return(a.first > b.first);
+}
+
 struct bnbNode{
     unordered_set<int> selectedItems;
     unordered_set<int> unselectedItems;
@@ -14,6 +18,28 @@ struct bnbNode{
     int weight = 0;
     int itemIdx = -1;
 };
+
+int bound(vector<pair<int, int>>& items,unordered_set<int>& selected, unordered_set<int>& unselected, 
+                                vector<pair<int, int>>& density, int& capacity, int val, int weight){
+    
+    for(auto item : density){
+        int key = item.second;
+        if(selected.find(key) != selected.end() || unselected.find(key) != unselected.end()){
+            continue;
+        }
+        int itemWeight = items[key].first, itemVal = items[key].second, remWeight = capacity - weight;
+        if(remWeight >= itemWeight){
+            val += itemVal;
+            weight += itemWeight;
+        }else{
+            val += item.first * remWeight;
+            break;
+        }
+    }
+
+    return val;
+}
+
 
 int bnbSolver(vector<pair<int, int>>& items, int capacity, 
                                 vector<bool>& selectedItems){
@@ -25,7 +51,7 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
         float value = (float)items[i].second / items[i].first;
         relaxationArr.push_back(make_pair(value, i));
     }
-    sort(relaxationArr.begin(), relaxationArr.end(), greater<>());
+    sort(relaxationArr.begin(), relaxationArr.end(), sortDescend);
 
     int remWeight = capacity, initialExpect = 0;
     for(pair<int, int> p : relaxationArr){
@@ -64,7 +90,8 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
             if(itemWeight <= remWeight){
                 unordered_set<int> cpySelected = n.selectedItems;
                 cpySelected.insert(i);
-                int b = bound(items, cpySelected, n.unselectedItems, relaxationArr, capacity);
+                int b = bound(items, cpySelected, n.unselectedItems, 
+                        relaxationArr, capacity, n.val + itemVal, n.weight + itemWeight);
                 if(b > best){
                     bnbNode newNode = n;
                     newNode.selectedItems = cpySelected;
@@ -74,7 +101,7 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
                 }
             }
             n.unselectedItems.insert(i);
-            int b = bound(items, n.selectedItems, n.unselectedItems, relaxationArr, capacity);
+            int b = bound(items, n.selectedItems, n.unselectedItems, relaxationArr, capacity, n.val, n.weight);
             if(b > best){
                 bnbStack.push(n);
             }
@@ -88,33 +115,8 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
     for(auto i : bestArr){
         selectedItems[i] = 1;
     }
-}
 
-int bound(vector<pair<int, int>>& items,unordered_set<int>& selected, unordered_set<int>& unselected, 
-                                                    vector<pair<int, int>>& density, int& capacity){
-    
-    int val = 0, weight = 0;
-    for(auto i : selected){
-        weight += items[i].first;
-        val += items[i].second;
-    }
-    
-    for(auto item : density){
-        int key = item.second;
-        if(selected.find(key) != selected.end() || unselected.find(key) != unselected.end()){
-            continue;
-        }
-        int itemWeight = items[key].first, itemVal = items[key].second, remWeight = capacity - weight;
-        if(remWeight >= itemWeight){
-            val += itemVal;
-            weight += itemWeight;
-        }else{
-            val += item.first * remWeight;
-            break;
-        }
-    }
-
-    return val;
+    return best;
 }
 
 
