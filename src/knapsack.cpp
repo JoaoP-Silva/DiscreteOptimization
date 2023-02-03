@@ -12,32 +12,45 @@ bool sortDescend(const pair<double, int>& a, const pair<double, int>& b){
 }
 
 struct bnbNode{
-    unordered_set<int> selectedItems;
-    unordered_set<int> unselectedItems;
-    int val = 0;
-    int weight = 0;
-    int itemIdx = -1;
+    bnbNode* parent;
+    int currVal = 0;
+    int remCapacity = 0;
+    int level = 0;
+    bool chosen = 0;
 };
 
-int bound(vector<pair<int, int>>& items,unordered_set<int>& selected, unordered_set<int>& unselected, 
-                                vector<pair<double, int>>& density, int& capacity, int val, int weight){
-    
-    for(auto item : density){
-        int key = item.second;
-        if(selected.find(key) != selected.end() || unselected.find(key) != unselected.end()){
-            continue;
-        }
-        int itemWeight = items[key].first, itemVal = items[key].second, remWeight = capacity - weight;
-        if(remWeight >= itemWeight){
-            val += itemVal;
-            weight += itemWeight;
+void traceChosenItems(bnbNode* lastNode, vector<bool> selected){
+    bnbNode* t = lastNode;
+    int i = selected.size() -1;
+    while(t != nullptr){
+        if(t->chosen == 0){
+            selected[i] = 0;
         }else{
-            val += item.first * remWeight;
-            break;
+            selected[i] = 1;
         }
+        t = t->parent;
+        i--;
+    }
+}
+
+
+float bound(vector<pair<int, int>>& items, vector<pair<double, int>>& relaxationArr,
+            int currVal, int remCapacity, int level){
+    
+    float expect = currVal;
+    while(remCapacity > 0){
+        int itemIdx = relaxationArr[level].second;
+        pair<int, int> item = items[itemIdx];
+        if(item.first > remCapacity){
+            expect += relaxationArr[level].first * remCapacity;
+        }else{
+            expect += item.second;
+            remCapacity -= item.first;
+        }
+        level++;
     }
 
-    return val;
+    return expect;
 }
 
 
@@ -45,76 +58,98 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
                                 vector<bool>& selectedItems){
     
     int numItems = items.size();
-    //Map with all values from linear relaxation
+    //Vector with all values from linear relaxation
     vector<pair<double, int>> relaxationArr;
     for(int i = 0; i < items.size(); i++){
+        if(items[i].first > capacity){ continue; }
+
         float value = (float)items[i].second / items[i].first;
         relaxationArr.push_back(make_pair(value, i));
     }
     sort(relaxationArr.begin(), relaxationArr.end(), sortDescend);
 
-    int remWeight = capacity, initialExpect = 0;
-    for(pair<int, int> p : relaxationArr){
-        int i = p.second, itemWeight = items[i].first, itemVal = items[i].second;
-        if(remWeight >= itemWeight){
-            remWeight -= itemWeight;
-            initialExpect += itemVal;
-        }else{
-            int val = p.first * remWeight;
-            initialExpect += val;
-            break;
-        }
-    }
+    bnbNode* wFirst = new bnbNode;
+    wFirst->parent = nullptr;
+    wFirst->chosen = 1;
+    int itemIdx = relaxationArr[0].second;
+    wFirst->currVal = items[itemIdx].second;
+    wFirst->remCapacity = capacity - items[itemIdx].first;
+    
+    bnbNode* woutFirst = new bnbNode;
+    woutFirst->parent = nullptr;
+    woutFirst->chosen = 0;
+    woutFirst->currVal= 0;
+    wFirst->remCapacity = capacity;
 
-    stack<bnbNode> bnbStack;
-    bnbNode withFirst, withoutFirst;
-    withoutFirst.unselectedItems.insert(0);
-    withoutFirst.itemIdx = 0;
-
-    withFirst.selectedItems.insert(0);
-    withFirst.itemIdx = 0;
-    withFirst.val = items[0].second;
-    withFirst.weight = items[0].first;
-    bnbStack.push(withFirst);
-    bnbStack.push(withoutFirst);
+    stack<bnbNode*> s;
+    s.push(woutFirst); s.push(wFirst);
     int best = -1;
-    unordered_set<int> bestArr;
-    while(!bnbStack.empty()){
-        bnbNode n = bnbStack.top(); bnbStack.pop();
-        if(n.itemIdx < items.size() -1){
-            n.itemIdx += 1;
-            int i = n.itemIdx;
-            int itemVal = items[i].second;
-            int itemWeight = items[i].first;
-            remWeight = capacity - n.weight;
-            if(itemWeight <= remWeight){
-                unordered_set<int> cpySelected = n.selectedItems;
-                cpySelected.insert(i);
-                int b = bound(items, cpySelected, n.unselectedItems, 
-                        relaxationArr, capacity, n.val + itemVal, n.weight + itemWeight);
-                if(b > best){
-                    bnbNode newNode = n;
-                    newNode.selectedItems = cpySelected;
-                    newNode.weight += itemWeight;
-                    newNode.val += itemVal;
-                    bnbStack.push(newNode);
+    bnbNode* selectedNode = nullptr;
+    while(!s.empty()){
+        bnbNode* n = s.top();
+        s.pop();
+        int level = n->level + 1;
+        int currVal = n->currVal;
+        int remCapacity = n->remCapacity;
+
+        if(level <= numItems){
+            itemIdx = relaxationArr[level].second;
+            int itemWeight = items[itemIdx].first;
+            int itemVal = items[itemIdx].second;
+            if(best == -1){
+                bnbNode* woutItem = new bnbNode;
+                woutItem->chosen = 0;
+                woutItem->currVal = currVal;
+                woutItem->level = level;
+                woutItem->parent = n;
+                woutItem->remCapacity = remCapacity;
+                s.push(woutItem);
+
+                if(remCapacity >= itemWeight){
+                    bnbNode* wItem = new bnbNode;
+                    wItem->currVal = currVal + itemVal;
+                    wItem->chosen = 1;
+                    wItem->level = level;
+                    wItem->parent = n;
+                    wItem->remCapacity = remCapacity - itemWeight;
+                    s.push(wItem);
                 }
             }
-            n.unselectedItems.insert(i);
-            int b = bound(items, n.selectedItems, n.unselectedItems, relaxationArr, capacity, n.val, n.weight);
-            if(b > best){
-                bnbStack.push(n);
+            else{
+                if(level < numItems - 1){
+                    float expectWout = bound(items, relaxationArr, currVal, remCapacity, level + 1);
+                    if(expectWout > best){
+                        bnbNode* woutItem = new bnbNode;
+                        woutItem->chosen = 0;
+                        woutItem->currVal = currVal;
+                        woutItem->level = level;
+                        woutItem->parent = n;
+                        woutItem->remCapacity = remCapacity;
+                        s.push(woutItem);
+                    }
+                }
+
+                float expectWith = bound(items, relaxationArr, currVal, remCapacity, level);
+                if(remCapacity >= itemWeight && expectWith > best){
+                    bnbNode* wItem = new bnbNode;
+                    wItem->currVal = currVal + itemVal;
+                    wItem->chosen = 1;
+                    wItem->level = level;
+                    wItem->parent = n;
+                    wItem->remCapacity = remCapacity - itemWeight;
+                    s.push(wItem);
+                }                     
             }
-        }else{
-            if(n.val > best){
-                best = n.val; bestArr = n.selectedItems;
+        }
+        else{
+            if(currVal > best){
+                best = currVal;
+                selectedNode = n;
             }
         }
     }
 
-    for(auto i : bestArr){
-        selectedItems[i] = 1;
-    }
+    traceChosenItems(selectedNode, selectedItems);
 
     return best;
 }
