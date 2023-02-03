@@ -19,7 +19,7 @@ struct bnbNode{
     bool chosen = 0;
 };
 
-void traceChosenItems(bnbNode* lastNode, vector<bool> selected){
+void traceChosenItems(bnbNode* lastNode, vector<bool>& selected){
     bnbNode* t = lastNode;
     int i = selected.size() -1;
     while(t != nullptr){
@@ -38,7 +38,7 @@ float bound(vector<pair<int, int>>& items, vector<pair<double, int>>& relaxation
             int currVal, int remCapacity, int level){
     
     float expect = currVal;
-    while(remCapacity > 0){
+    while(remCapacity > 0 && level < items.size()){
         int itemIdx = relaxationArr[level].second;
         pair<int, int> item = items[itemIdx];
         if(item.first > remCapacity){
@@ -79,7 +79,7 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
     woutFirst->parent = nullptr;
     woutFirst->chosen = 0;
     woutFirst->currVal= 0;
-    wFirst->remCapacity = capacity;
+    woutFirst->remCapacity = capacity;
 
     stack<bnbNode*> s;
     s.push(woutFirst); s.push(wFirst);
@@ -92,7 +92,7 @@ int bnbSolver(vector<pair<int, int>>& items, int capacity,
         int currVal = n->currVal;
         int remCapacity = n->remCapacity;
 
-        if(level <= numItems){
+        if(level < numItems){
             itemIdx = relaxationArr[level].second;
             int itemWeight = items[itemIdx].first;
             int itemVal = items[itemIdx].second;
